@@ -6,6 +6,11 @@ export interface openaiListModelsResponse {
         object?: string;
         created?: number;
         owned_by?: string;
+        config?: {
+            stream?: boolean;
+            VL?: boolean,
+            langchain?: boolean
+        }
     }[];
 }
 
@@ -40,7 +45,22 @@ export interface openaiChatCompletionRequestMessages {
 interface openaiChatCompletionRequest extends openaiChatCompletionRequestParams {
     model: string;
     messages: openaiChatCompletionRequestMessages[];
-    // todo: to support tool_calls
+    functions?: any;    // deprecated
+    function_call?: any;   // deprecated
+    tools?: {
+        type: string;
+        function: {
+            description?: string;
+            name: string;
+            parameters?: any;
+        };
+    }[];
+    tool_choice?: "auto" | "none" | {
+        type: "function";
+        function: {
+            name: string;
+        };
+    };
 }
 
 export interface openaiChatCompletionResponse {
@@ -54,7 +74,15 @@ export interface openaiChatCompletionResponse {
         message?: {
             role: string;
             content?: string;
-            // todo: to support tool_calls
+            tool_calls?: {
+                id: string;
+                type: string;
+                function: {
+                    name: string;
+                    arguments: string;
+                };
+            }[];
+            function_call?: any;    // deprecated
         };
         delta?: {
             role?: string;

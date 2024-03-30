@@ -51,6 +51,7 @@
     "localforage": "^1.10.0",
     "markdown-it": "^14.0.0",
     "nanoid": "^5.0.5",
+    "openai": "^4.30.0",
     "vue": "^3.3.11",
     "vue-router": "^4.2.5"
   },

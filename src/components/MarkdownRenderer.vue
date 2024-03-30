@@ -81,7 +81,8 @@ function copyContent() {
   <div style="gap: 0.75rem; flex-direction: column; box-sizing: border-box; display: block">
     <div class="flexBox">
       <article class="markdown-body" ref="codeBlocksContainer">
-        <div v-html="md.render(props.content)" class="markdown"/>
+        <div class="markdown" v-if="props.role == 'user'">{{props.content}}</div>
+        <div v-html="md.render(props.content)" class="markdown" v-else/>
       </article>
       <div class="markdown__Tools">
         <el-button class="markdown__Copy" link @click="copyContent()">

@@ -3,9 +3,11 @@ import axios from 'axios';
 import {
     openaiChatCompletionRequestMessages,
     openaiChatCompletionRequestParams,
-    openaiChatCompletionResponse,
     openaiListModelsResponse
 } from '@/types/OpenaiAPI'
+
+import OpenAI from "openai";
+import {Stream} from "openai/streaming";
 
 const API_VERSION: string = "v1"
 const OPENAI_API_KEY: string = "EMPTY"
@@ -21,7 +23,7 @@ const apiClient = axios.create({
 })
 
 // v1/models
-export async function listModels(url: string): Promise<string[]> {
+export async function listModels(url: string): Promise<openaiListModelsResponse> {
     /* List all available models. */
     const modelListURL = new URL(url)
     modelListURL.pathname = `/${API_VERSION}/models`
@@ -32,7 +34,7 @@ export async function listModels(url: string): Promise<string[]> {
             url: modelListURL.toString()
         }).then(response => {
             const data: openaiListModelsResponse = response.data
-            resolve(data.data.map(model => model.id))
+            resolve(data)
         }).catch(error => {
             console.error(error)
             reject(error)
@@ -47,30 +49,18 @@ export async function createChatCompletion(
     model_name: string,
     api_key?: string,
     additionalParams?: openaiChatCompletionRequestParams,
-): Promise<openaiChatCompletionResponse> {
+    ): Promise<OpenAI.Chat.Completions.ChatCompletion | Stream<OpenAI.Chat.Completions.ChatCompletionChunk>> {
     /* Create a chat completion. */
     const completionURL = new URL(url)
-    completionURL.pathname = `/${API_VERSION}/chat/completions`
-    // todo: unsupported stream
-    return new Promise(async (resolve, reject) => {
-        try {
-            const response = await apiClient({
-                method: "post",
-                url: completionURL.toString(),
-                data: {
-                    messages: messages,
-                    model: model_name,
-                    ...additionalParams
-                },
-                headers: {
-                    Authorization: `Bearer ${api_key ? 'EMPTY' : api_key}`
-                }
-            })
-            const data: openaiChatCompletionResponse = response.data
-            resolve(data)
-        } catch (error) {
-            console.error(error)
-            reject(error)
-        }
-    })
+    completionURL.pathname = `/${API_VERSION}`
+    const openai: OpenAI = new OpenAI({
+        baseURL: completionURL.toString(),
+        apiKey: api_key ? api_key : OPENAI_API_KEY,
+        dangerouslyAllowBrowser: true
+    });
+    return openai.chat.completions.create({
+        messages: messages as OpenAI.Chat.Completions.ChatCompletionMessage[],
+        model: model_name,
+        stream: additionalParams?.stream
+    });
 }

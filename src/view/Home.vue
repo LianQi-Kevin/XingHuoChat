@@ -56,11 +56,14 @@ function refreshModelList() {
   modelList.length = 0
 
   // 获取模型列表
-  listModels(apiConfigs.API_URL).then(models => {
-    models.map(item => {
+  listModels(apiConfigs.API_URL).then(data => {
+    data.data.map(model => model.id).map(item => {
       modelList.push({label: item.split('/')[1], value: item})
     })
     modelName.value = modelList[0]?.value
+  }).catch(() => {
+    ElMessage.error("Failed to get model list")
+    showConfig.value = true
   })
 }
 
@@ -77,7 +80,6 @@ watch(messagesList, () => {
     chatCard.scrollTop = chatCard.scrollHeight
   }
 }, {deep: true, flush: 'post'})
-
 </script>
 
 <template>

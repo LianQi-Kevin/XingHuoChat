@@ -25,7 +25,9 @@ export type ApiConfigsType = Omit<openaiChatCompletionRequestParams,
   "logprobs" | "n" | "seed" | "stop" | "user" | "presence_penalty" | "frequency_penalty"> & {
   API_URL: string;
   API_KEY?: string;
-  displayModels?: Boolean;
+  displayModels?: boolean;
+  VL?: boolean;
+  langchain?: boolean;
 };
 
 
@@ -35,7 +37,9 @@ const apiConfigs = reactive<ApiConfigsType>({
   max_tokens: 500,
   temperature: 0.7,
   top_p: 1,
-  stream: false,
+  stream: true,
+  VL: false,
+  langchain: false,
   displayModels: true,
 });
 
@@ -51,8 +55,17 @@ async function beforeClose(formEl: FormInstance | undefined) {
   if (!formEl) return // 非空
   // verify the API_URL
   try {
-    const models = await listModels(apiConfigs.API_URL)
-    ElMessage.success(`API verify Pass, Get model: ${models[0]}`);
+    const data = await listModels(apiConfigs.API_URL)
+    if (data.data[0]?.config) {
+      apiConfigs.stream = data.data[0]?.config?.stream;
+      apiConfigs.VL = data.data[0]?.config?.VL;
+      apiConfigs.langchain = data.data[0]?.config?.langchain;
+    } else {
+      apiConfigs.stream = true;
+      apiConfigs.VL = false;
+      apiConfigs.langchain = false;
+    }
+    ElMessage.success(`API verify Pass, Get model: ${data.data.map(model => model.id)[0]}`);
     await OpenaiAPI_DB.setItem("apiConfigs", toRaw(apiConfigs));
     display.value = false;
 
@@ -60,18 +73,22 @@ async function beforeClose(formEl: FormInstance | undefined) {
     emit("onSubmit", toRaw(apiConfigs));
   } catch (err) {
     if (!ruleFormRef.value) return // 非空
-    ruleFormRef.value.validateField("API_URL", () => {
-      ElMessage.error("Please type the API URL & API KEY");
-    });
+    if (err instanceof TypeError) {
+      ruleFormRef.value.validateField("API_URL", () => {
+        ElMessage.error("Please type the API URL & API KEY");
+      });
+    } else {
+      ElMessage.error("API verify failed, please check the API URL & API KEY")
+    }
   }
 }
 
 
 onMounted(() => {
   nextTick(() => {
+    // 检查数据库内是否存在已保存数据，更新全局变量
     OpenaiAPI_DB.getItem("apiConfigs").then((res) => {
       if (res) {
-        // 对结果进行JSON序列化
         Object.assign(apiConfigs, res);
       }
     });
@@ -111,7 +128,7 @@ onMounted(() => {
             <el-slider v-model.number="apiConfigs.top_p" :max="1" :min="0" :step="0.1" show-input/>
           </el-form-item>
           <el-form-item label="Stream Chat" prop="stream">
-            <el-switch v-model.number="apiConfigs.stream" :disabled="true"/>
+            <el-switch v-model.number="apiConfigs.stream" />
           </el-form-item>
         </el-collapse-item>
         <el-collapse-item name="2" title="Page Configurations">
@@ -123,7 +140,7 @@ onMounted(() => {
     </el-form>
 
     <template #footer>
-      <div style="width: 100%; display: flex; flex-direction: row; justify-content: flex-end;">
+      <div class="dialog__footer">
         <el-button plain @click="display = false">Cancel</el-button>
         <el-button plain type="primary" @click="beforeClose(ruleFormRef)">Save</el-button>
       </div>
@@ -132,5 +149,10 @@ onMounted(() => {
 </template>
 
 <style lang="scss" scoped>
-
+.dialog__footer {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+}
 </style>

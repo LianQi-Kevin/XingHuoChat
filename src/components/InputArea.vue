@@ -13,6 +13,7 @@ import {getBase64} from "@/tools/base64";
 import {convertUnixTimeToFormattedTime, getCurrentFormattedTime} from "@/tools/nowTime";
 import {createChatCompletion} from "@/network/OpenaiApi";
 import {createMessageContent} from "@/tools/QwenVisual";
+import {Stream} from "openai/streaming";
 
 // props
 const props = defineProps<{
@@ -90,32 +91,39 @@ async function submitMessage() {
   // 添加占位符到 messagesList
   const placeholderIndex = messagesList.value.push({content: '', role: 'assistant', loading: true, text: ""}) - 1;
 
-  try {
-    // 执行请求，使用不包含占位符的副本
-    const {API_URL, API_KEY, ...openaiParams} = props.api_config;
-    const response = await createChatCompletion(
-      API_URL,
-      messagesWithoutPlaceholder,
-      props.modelName,
-      API_KEY,
-      openaiParams
-    );
-    let placeholder = messagesList.value[placeholderIndex];
-    placeholder.loading = false;
-
-    const responseText = response?.choices[0]?.message?.content;
-    placeholder.time = convertUnixTimeToFormattedTime(response?.created)
-    placeholder.content = responseText ?? "Error: No response";
-    placeholder.text = responseText ?? "Error: No response";
-  } catch (error) {
+  // 执行请求，使用不包含占位符的副本
+  const {API_URL, API_KEY, ...openaiParams} = props.api_config;
+  createChatCompletion(
+    API_URL,
+    messagesWithoutPlaceholder,
+    props.modelName,
+    API_KEY,
+    openaiParams
+  ).then(async response => {
+    const placeholder = messagesList.value[placeholderIndex];
+    if (response instanceof Stream) {
+      placeholder.time = getCurrentFormattedTime();
+      for await (const chunk of response) {
+        console.log(chunk.choices[0]?.delta?.content || '');
+        placeholder.content += chunk.choices[0]?.delta?.content || '';
+        placeholder.text += chunk.choices[0]?.delta?.content || '';
+        console.debug("response chunk:", chunk.choices[0]?.delta?.content)
+      }
+    } else {
+      console.debug("response:", response?.choices[0]?.message?.content)
+      placeholder.time = convertUnixTimeToFormattedTime(response?.created);
+      placeholder.content = response?.choices[0]?.message?.content ?? "Error: No response";
+      placeholder.text = response?.choices[0]?.message?.content ?? "Error: No response";
+    }
+  }).catch(error => {
     console.error("Error submitting message:", error);
     // 错误处理，可以选择更新占位符显示错误信息或移除占位符
-    messagesList.value[placeholderIndex].loading = false
     messagesList.value[placeholderIndex].requestError = true
-  } finally {
+  }).finally(() => {
     // 无论成功还是失败，都需要停止加载状态
-    submitLoading.value = false;
-  }
+    messagesList.value[placeholderIndex].loading = false
+    submitLoading.value = false
+  });
 }
 
 
@@ -235,15 +243,27 @@ async function ajaxUpload(option: UploadRequestOptions): Promise<XMLHttpRequest>
   xhr.send(formData)
   return xhr
 }
+
+// 更新 el-upload 的 accept
+const accept_type = ref<string>('.jpg, .jpeg, .png, .webp, .bmp')
+watch(props.api_config, () => {
+  if (!(props.api_config.VL || props.api_config.langchain)) return
+  if (props.api_config.VL) {
+    accept_type.value = '.jpg, .jpeg, .png, .webp, .bmp'
+  }
+  if (props.api_config.langchain) {
+    accept_type.value = '*'
+  }
+})
 </script>
 
 <template>
   <FilePreview v-if="uploadFileList.length" :file-list="uploadFileList" class="filePreview"
                show-remove @removeBtnClick="removeUploadItem"/>
   <div class="rowTools">
-    <el-upload ref="uploadRef" :accept="`.jpg, .jpeg, .png, .webp, .bmp`" :auto-upload="true"
+    <el-upload ref="uploadRef" :accept="accept_type" :auto-upload="true" v-if="api_config.VL || api_config.langchain"
                :http-request="ajaxUpload" :limit="10" :multiple="true" :show-file-list="false"
-               action="#" class="uploadMain" method="post">
+               action="#" class="uploadMain" method="post" >
       <el-button class="uploadBtn" link size="large" type="info">
         Select Files
         <el-icon style="margin-left: 5px">
@@ -251,6 +271,7 @@ async function ajaxUpload(option: UploadRequestOptions): Promise<XMLHttpRequest>
         </el-icon>
       </el-button>
     </el-upload>
+    <div v-else/>
     <el-button class="refreshBtn" link size="large" type="info" @click="refreshMessages">
       New Chat
       <el-icon style="margin-left: 5px">
