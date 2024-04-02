@@ -1,10 +1,10 @@
 import {nanoid} from 'nanoid'
-import Base64 from "crypto-js/enc-base64.js";
-import HmacSHA256 from "crypto-js/hmac-sha256.js";
+import CryptoJS from 'crypto-js'
+import {startup} from "vite-plugin-electron";
 
 
 /**
- * Generates an authenticated URL for XunFei XingHuo LLM WebSocket Protocol. \
+ * Generates an authenticated URL for XunFei Spark LLM WebSocket Protocol. \
  * https://www.xfyun.cn/doc/spark/general_url_authentication.html
  *
  * @param {string} apiKey - The API key for authentication.
@@ -12,33 +12,39 @@ import HmacSHA256 from "crypto-js/hmac-sha256.js";
  * @param {string} [wssURL ='wss://spark-api.xf-yun.com/v1.1/chat'] - The WebSocket Secure endpoint URL.
  * @returns {string} - Authenticated WebSocket Secure URL with query parameters.
  */
-function GenerateWSSAuthURL(apiKey, apiSecret, wssURL = 'wss://spark-api.xf-yun.com/v1.1/chat') {
-    const dateRFC1123 = new Date().toUTCString();
-    const url = new URL(wssURL);
+function GenerateWebsocketUrl(apiKey: string, apiSecret: string, wssURL: string ) {
+    return new Promise((resolve, reject) => {
+        const dateRFC1123 = new Date().toUTCString();
+        const url = new URL(wssURL);
 
-    // 使用CryptoJS生成签名
-    // const message = `host: ${url.hostname}\ndate: ${dateRFC1123}\nGET ${url.pathname} HTTP/1.1`;
-    const message = `host: ${location.host}\ndate: ${dateRFC1123}\nGET ${url.pathname} HTTP/1.1`;
-    const signature = Base64.stringify(HmacSHA256(message, apiSecret));
+        // 使用CryptoJS生成签名
+        const signatureOrigin: string = `host: ${location.host}\ndate: ${dateRFC1123}\nGET ${url.pathname} HTTP/1.1`;
+        const signatureSha: CryptoJS.lib.WordArray = CryptoJS.HmacSHA256(signatureOrigin, apiSecret);
+        const signature: string = CryptoJS.enc.Base64.stringify(signatureSha)
 
-    // 授权头
-    const algorithm = 'hmac-sha256'
-    const headers = 'host date request-line'
-    const authorization = btoa(
-        `api_key="${apiKey}", algorithm="${algorithm}", headers="${headers}", signature="${signature}"`,
-    );
+        // 授权头
+        const algorithm = 'hmac-sha256'
+        const headers = 'host date request-line'
+        const authorizationOrigin = `api_key="${apiKey}", algorithm="${algorithm}", headers="${headers}", signature="${signature}"`
+        const authorization = btoa(authorizationOrigin)
 
-    // 设置URL查询参数
-    url.search = new URLSearchParams({
-        'authorization': authorization,
-        'date': dateRFC1123,
-        'host': url.host
-    }).toString();
-    return url.href
+        // 设置URL查询参数
+        const target_url = `${url}?authorization=${authorization}&date=${dateRFC1123}&host=${location.host}`
+
+        resolve(target_url)
+    })
 }
 
 export class WSRecorder {
-    constructor(APPID, APISecret, APIKey, UserID = nanoid()) {
+    private readonly APPID: string;
+    private readonly APISecret: string;
+    private readonly APIKey: string;
+    private readonly UID: string;
+    private tokenCost: number;
+    private status: string;
+    private totalResult: string;
+    private readonly chatID: string;
+    constructor(APPID: string, APISecret: string, APIKey: string, UserID: string = nanoid()) {
         // base info
         this.APPID = APPID;
         this.APISecret = APISecret;
@@ -53,7 +59,8 @@ export class WSRecorder {
         // console.debug(this)
     }
 
-    _paramsGeneration(text, domain = "generalv3.5", temperature = 0.5, max_tokens = 4096, top_k = 4) {
+    _paramsGeneration(text: string, domain: string = "generalv3.5", temperature: number = 0.5,
+                      max_tokens: number = 4096, top_k: number = 4) {
         const params = {
             "header": {"app_id": this.APPID, "uid": this.UID},
             "parameter": {
@@ -71,7 +78,7 @@ export class WSRecorder {
         return params
     }
 
-    _preprocess(messages, version='3.5',validRoles = ['user', 'assistant', 'system']) {
+    _preprocess(messages: {role: "user" | "assistant" | "system", content: string}[], version='3.5',validRoles = ['user', 'assistant', 'system']) {
         const extracted = [];
 
         for (const { role, content } of messages) {
@@ -103,7 +110,8 @@ export class WSRecorder {
         return extracted;
     }
 
-    connectWebSocket(text, temperature = 0.5, max_tokens = 4096, top_k = 4, domain = "generalv3.5", wssURL = 'wss://spark-api.xf-yun.com/v3.5/chat') {
+    connectWebSocket(text: string, temperature: number = 0.5, max_tokens: number = 4096, top_k: number = 4,
+                     domain: string = "generalv3.5", wssURL: string = 'wss://spark-api.xf-yun.com/v3.5/chat') {
         const url = GenerateWSSAuthURL(this.APIKey, this.APISecret, wssURL)
         console.log(url.replace('ws:', 'https:'));
         // console.log(JSON.stringify(this._paramsGeneration(text, domain, temperature, max_tokens, top_k)));
