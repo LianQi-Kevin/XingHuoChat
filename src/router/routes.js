@@ -1,4 +1,5 @@
-import Home from "@/view/Home.vue";
+// import Home from "@/view/Home.vue";
+import Home from "@/view/Home_Spark.vue";
 
 const routes = [
     {
@@ -11,14 +12,27 @@ const routes = [
             title: 'ChatFrontend'   // 页面标题 ( 非必要 )
         }
     },
-    {
-        path: '/config',
-        name: 'Config',
-        component: () => import('@/view/Config.vue'),
-        meta: {
-            title: 'Config'
-        }
-    },
+    // {
+    //     path: '/developer',
+    //     name: 'TEST',
+    //     component: () => import('@/view/Developer.vue'),
+    // },
+    // {
+    //     path: '/home_Spark',
+    //     name: 'Home_Spark',
+    //     component: () => import('@/view/Home_Spark.vue'),
+    //     meta: {
+    //         title: 'ChatFrontend'   // 页面标题 ( 非必要 )
+    //     }
+    // },
+    // {
+    //     path: '/config',
+    //     name: 'Config',
+    //     component: () => import('@/view/Config.vue'),
+    //     meta: {
+    //         title: 'Config'
+    //     }
+    // },
     {
         // 配置全局匹配，跳转到 /
         path: '/:pathMatch(.*)*',

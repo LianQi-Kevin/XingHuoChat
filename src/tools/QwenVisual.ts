@@ -1,6 +1,15 @@
 import {openaiChatCompletionRequestMessagesContent} from "@/types/OpenaiAPI";
-import type {FilePreviewRaw} from "@/components/FilePreview.vue";
+// import type {FilePreviewRaw} from "@/components/FilePreview.vue";
 
+interface FilePreviewRaw {
+    xhr?: XMLHttpRequest,
+    raw: File,
+    uid: number,
+    url?: string,
+    b64?: string,
+    progress?: number,
+    status?: 'success' | 'warning' | 'exception'
+}
 
 interface matchBoxType {
     name: string,

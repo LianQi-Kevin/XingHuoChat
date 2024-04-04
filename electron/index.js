@@ -14,7 +14,12 @@ function createWindow() {
     // You can use `process.env.VITE_DEV_SERVER_URL` when the vite command is called `serve`
     if (process.env.VITE_DEV_SERVER_URL) {
         console.log('vite dev server url:', process.env.VITE_DEV_SERVER_URL)
-        win.loadURL(process.env.VITE_DEV_SERVER_URL).then(() => {
+
+        const dev_url = new URL(process.env.VITE_DEV_SERVER_URL)
+        dev_url.pathname = 'developer'
+        console.debug('dev_url:', dev_url.toString())
+
+        win.loadURL(dev_url.toString()).then(() => {
             console.debug('loadURL success')
         })
         win.webContents.openDevTools({mode:'right'})
